@@ -7,6 +7,68 @@
     <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK Modular Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+        // Your exact Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC3WqWZCromkv1SJwlCYAKHUY16zJp8sR8",
+            authDomain: "sos-alert-1c1a8.firebaseapp.com",
+            databaseURL: "https://sos-alert-1c1a8-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "sos-alert-1c1a8",
+            storageBucket: "sos-alert-1c1a8.firebasestorage.app",
+            messagingSenderId: "28077774228",
+            appId: "1:28077774228:web:1c5c507eaa2fb5e3ed6b81"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const alertRef = ref(db, 'sos_alerts/current');
+
+        // Expose functions globally for UI interaction
+        window.firebaseTriggerSOS = function(lat, lng) {
+            set(alertRef, {
+                active: true,
+                latitude: lat,
+                longitude: lng,
+                timestamp: Date.now()
+            }).then(() => {
+                const statusBox = document.getElementById('senderStatusBox');
+                statusBox.innerText = "🚨 SUCCESS: SOS Alert & Live GPS Sent to Cloud!";
+                statusBox.className = "p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300 mt-6";
+            }).catch((error) => {
+                const statusBox = document.getElementById('senderStatusBox');
+                statusBox.innerText = "❌ Error sending SOS: " + error.message;
+                statusBox.className = "p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-300 mt-6";
+            });
+        };
+
+        window.firebaseResetSOS = function() {
+            set(alertRef, {
+                active: false,
+                latitude: null,
+                longitude: null,
+                timestamp: Date.now()
+            });
+        };
+
+        // Listen for live updates from Firebase Realtime Database
+        onValue(alertRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                window.updateReceiverDashboard(data);
+            }
+        });
+
+        // Update connection status badge
+        document.getElementById('connectionBadge').innerText = "● Cloud Connected";
+        document.getElementById('connectionBadge').className = "px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 font-medium";
+    </script>
+
     <style>
         body { font-family: 'Inter', sans-serif; }
         @keyframes pulse-fast {
@@ -25,18 +87,18 @@
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center font-bold text-xl shadow-lg shadow-red-600/30">🚨</div>
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight text-white">Secure SOS Network</h1>
-                    <p class="text-xs text-slate-400">Instant cross-device emergency alerting system</p>
+                    <h1 class="text-xl font-bold tracking-tight text-white">Cloud SOS Network</h1>
+                    <p class="text-xs text-slate-400">Firebase Realtime Cross-Device Emergency System</p>
                 </div>
             </div>
             
-            <!-- Mode Switcher Tabs -->
+            <!-- Mode Switcher Tabs (Sender / Receiver) -->
             <div class="bg-slate-800 p-1 rounded-xl flex space-x-1 border border-slate-700">
-                <button id="tabPhone" onclick="switchMode('phone')" class="px-4 py-2 text-sm font-medium rounded-lg transition-all bg-red-600 text-white shadow">
-                    📱 Phone (Sender)
+                <button id="tabSender" onclick="switchMode('sender')" class="px-4 py-2 text-sm font-medium rounded-lg transition-all bg-red-600 text-white shadow">
+                    📡 Sender
                 </button>
-                <button id="tabLaptop" onclick="switchMode('laptop')" class="px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white">
-                    💻 Laptop (Receiver)
+                <button id="tabReceiver" onclick="switchMode('receiver')" class="px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white">
+                    💻 Receiver
                 </button>
             </div>
         </div>
@@ -44,40 +106,40 @@
 
     <main class="flex-grow max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
 
-        <!-- ================= PHONE VIEW (SENDER) ================= -->
-        <div id="phoneView" class="space-y-6">
+        <!-- ================= SENDER VIEW ================= -->
+        <div id="senderView" class="space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 text-center shadow-xl">
                 <h2 class="text-2xl font-bold text-white mb-2">Emergency SOS Transmitter</h2>
-                <p class="text-slate-400 text-sm mb-8">Tap and hold or press the button below to transmit your live GPS coordinates and trigger remote alarms instantly.</p>
+                <p class="text-slate-400 text-sm mb-8">Tap the button below to transmit your live GPS coordinates via Firebase cloud to your receiver device instantly.</p>
 
                 <!-- Big SOS Trigger Button -->
                 <div class="my-6 flex justify-center">
-                    <button onclick="triggerSOS()" class="w-48 h-48 sm:w-56 sm:h-56 bg-gradient-to-br from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 active:scale-95 transition-all rounded-full border-8 border-red-900/50 shadow-2xl shadow-red-600/50 flex flex-col items-center justify-center group cursor-pointer">
+                    <button onclick="handleSOSClick()" class="w-48 h-48 sm:w-56 sm:h-56 bg-gradient-to-br from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 active:scale-95 transition-all rounded-full border-8 border-red-900/50 shadow-2xl shadow-red-600/50 flex flex-col items-center justify-center group cursor-pointer">
                         <span class="text-4xl sm:text-5xl font-black text-white tracking-wider group-hover:scale-110 transition-transform">SOS</span>
                         <span class="text-xs font-semibold text-red-200 mt-2 uppercase tracking-widest">Press to Alert</span>
                     </button>
                 </div>
 
                 <!-- Status Feedback Box -->
-                <div id="phoneStatusBox" class="p-4 rounded-xl bg-slate-800 border border-slate-700 text-sm text-slate-300 mt-6 transition-all">
+                <div id="senderStatusBox" class="p-4 rounded-xl bg-slate-800 border border-slate-700 text-sm text-slate-300 mt-6 transition-all">
                     Status: Ready. Location will be fetched automatically upon pressing SOS.
                 </div>
             </div>
 
             <!-- Configuration / Connection info -->
             <div class="bg-slate-900/50 border border-slate-800/80 rounded-xl p-4 text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center gap-2">
-                <span>Network Protocol: Real-Time Session Bus</span>
-                <span id="connectionBadge" class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 font-medium">● System Linked</span>
+                <span>Database: Firebase Realtime Cloud</span>
+                <span id="connectionBadge" class="px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 font-medium">● Connecting...</span>
             </div>
         </div>
 
-        <!-- ================= LAPTOP VIEW (RECEIVER) ================= -->
-        <div id="laptopView" class="hidden space-y-6">
+        <!-- ================= RECEIVER VIEW ================= -->
+        <div id="receiverView" class="hidden space-y-6">
             <!-- Alert Banner Container -->
-            <div id="laptopAlertBanner" class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-6 sm:p-8 text-center shadow-2xl transition-all">
+            <div id="receiverAlertBanner" class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-6 sm:p-8 text-center shadow-2xl transition-all">
                 <div id="alertIcon" class="text-6xl mb-4">🛡️</div>
-                <h2 id="laptopStatusTitle" class="text-2xl sm:text-3xl font-bold text-emerald-400 tracking-tight">System Status: Monitoring...</h2>
-                <p id="laptopStatusSubtitle" class="text-slate-400 text-sm mt-2">Listening for emergency signals from connected mobile devices...</p>
+                <h2 id="receiverStatusTitle" class="text-2xl sm:text-3xl font-bold text-emerald-400 tracking-tight">System Status: Monitoring...</h2>
+                <p id="receiverStatusSubtitle" class="text-slate-400 text-sm mt-2">Listening for emergency signals from connected sender devices...</p>
 
                 <!-- Location details container (hidden by default) -->
                 <div id="locationCard" class="hidden mt-6 bg-slate-950 border border-red-500/30 rounded-xl p-5 text-left space-y-3">
@@ -120,38 +182,35 @@
     </main>
 
     <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        Secure Web SOS System &bull; Designed for Mobile-to-Laptop Emergency Alerts
+        Cloud SOS System &bull; Secured with Firebase Realtime Database
     </footer>
 
     <script>
-        // In-memory / localStorage sync channel simulation so users can test immediately in one or multiple browser windows/tabs
-        const STORAGE_KEY = "sos_system_state_v1";
-
         let audioCtx = null;
         let alarmInterval = null;
         let isAlarmPlaying = false;
 
-        // Switch UI Mode between Phone (Sender) and Laptop (Receiver)
+        // Switch UI Mode between Sender and Receiver
         function switchMode(mode) {
-            const phoneView = document.getElementById('phoneView');
-            const laptopView = document.getElementById('laptopView');
-            const tabPhone = document.getElementById('tabPhone');
-            const tabLaptop = document.getElementById('tabLaptop');
+            const senderView = document.getElementById('senderView');
+            const receiverView = document.getElementById('receiverView');
+            const tabSender = document.getElementById('tabSender');
+            const tabReceiver = document.getElementById('tabReceiver');
 
-            if (mode === 'phone') {
-                phoneView.classList.remove('hidden');
-                laptopView.classList.add('hidden');
-                tabPhone.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all bg-red-600 text-white shadow";
-                tabLaptop.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white";
+            if (mode === 'sender') {
+                senderView.classList.remove('hidden');
+                receiverView.classList.add('hidden');
+                tabSender.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all bg-red-600 text-white shadow";
+                tabReceiver.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white";
             } else {
-                phoneView.classList.add('hidden');
-                laptopView.classList.remove('hidden');
-                tabLaptop.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all bg-red-600 text-white shadow";
-                tabPhone.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white";
+                senderView.classList.add('hidden');
+                receiverView.classList.remove('hidden');
+                tabReceiver.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all bg-red-600 text-white shadow";
+                tabSender.className = "px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white";
             }
         }
 
-        // Web Audio API emergency beep generator (no external audio files required)
+        // Web Audio API emergency beep generator
         function playBeep() {
             try {
                 if (!audioCtx) {
@@ -164,7 +223,7 @@
                 const gain = audioCtx.createGain();
                 
                 osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch alert tone
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.2);
 
                 gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
@@ -201,133 +260,69 @@
             playBeep();
         }
 
-        // Trigger SOS from Phone
-        function triggerSOS() {
-            const statusBox = document.getElementById('phoneStatusBox');
-            statusBox.innerText = "Status: Fetching GPS location...";
+        // Handle SOS button click on Sender
+        function handleSOSClick() {
+            const statusBox = document.getElementById('senderStatusBox');
+            statusBox.innerText = "Status: Fetching high-accuracy GPS location...";
             statusBox.className = "p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-300 mt-6";
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        const payload = {
-                            active: true,
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude,
-                            timestamp: Date.now()
-                        };
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-                        
-                        statusBox.innerText = "🚨 SUCCESS: SOS Alert & Location Transmitted to Laptop!";
-                        statusBox.className = "p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300 mt-6";
+                        window.firebaseTriggerSOS(position.coords.latitude, position.coords.longitude);
                     },
                     (error) => {
-                        // Fallback if GPS is blocked or unavailable
-                        const payload = {
-                            active: true,
-                            latitude: 11.2588, // Default fallback coordinates (e.g., Kozhikode region center)
-                            longitude: 75.7804,
-                            timestamp: Date.now()
-                        };
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-                        
-                        statusBox.innerText = "⚠️ Location permission denied/unavailable. Sent default test coordinates.";
+                        // Fallback coordinates if location permissions are denied
+                        window.firebaseTriggerSOS(11.2588, 75.7804);
+                        statusBox.innerText = "⚠️ Location denied or unavailable. Sent default coordinates.";
                         statusBox.className = "p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-300 mt-6";
                     },
-                    { enableHighAccuracy: true, timeout: 10000 }
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
             } else {
-                const payload = {
-                    active: true,
-                    latitude: 11.2588,
-                    longitude: 75.7804,
-                    timestamp: Date.now()
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-                statusBox.innerText = "🚨 SOS Alert sent (Geolocation not supported on this device).";
-                statusBox.className = "p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300 mt-6";
+                window.firebaseTriggerSOS(11.2588, 75.7804);
             }
         }
 
         // Reset SOS state
         function resetSOS() {
-            const payload = { active: false, latitude: null, longitude: null, timestamp: Date.now() };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-            
-            // Also reset local phone status if visible
-            const phoneStatus = document.getElementById('phoneStatusBox');
-            if(phoneStatus) {
-                phoneStatus.innerText = "Status: Ready. Location will be fetched automatically upon pressing SOS.";
-                phoneStatus.className = "p-4 rounded-xl bg-slate-800 border border-slate-700 text-sm text-slate-300 mt-6";
-            }
-
-            updateLaptopReceiver({ active: false });
+            window.firebaseResetSOS();
         }
 
-        // Update Laptop Receiver UI based on state data
-        function updateLaptopReceiver(data) {
-            const banner = document.getElementById('laptopAlertBanner');
-            const title = document.getElementById('laptopStatusTitle');
-            const subtitle = document.getElementById('laptopStatusSubtitle');
-            const icon = document.getElementById('alertIcon');
-            const locCard = document.getElementById('locationCard');
-            const latVal = document.getElementById('latVal');
-            const lngVal = document.getElementById('lngVal');
-            const mapLink = document.getElementById('mapLink');
+        // Update Receiver dashboard when data changes in Firebase
+        window.updateReceiverDashboard = function(data) {
+            const banner = document.getElementById('receiverAlertBanner');
+            const statusTitle = document.getElementById('receiverStatusTitle');
+            const statusSubtitle = document.getElementById('receiverStatusSubtitle');
+            const alertIcon = document.getElementById('alertIcon');
+            const locationCard = document.getElementById('locationCard');
 
             if (data && data.active === true) {
-                banner.className = "bg-red-950/40 border-2 border-red-600 rounded-2xl p-6 sm:p-8 text-center shadow-2xl sos-pulse transition-all";
-                icon.innerText = "🚨";
-                title.innerText = "EMERGENCY SOS ALERT TRIGGERED!";
-                title.className = "text-2xl sm:text-3xl font-bold text-red-500 tracking-tight";
-                subtitle.innerText = "An emergency distress signal has been received from your mobile device.";
+                banner.className = "bg-red-950/40 border-2 border-red-600 rounded-2xl p-6 sm:p-8 text-center shadow-2xl transition-all sos-pulse";
+                alertIcon.innerText = "🚨";
+                statusTitle.innerText = "EMERGENCY SOS ALERT ACTIVE!";
+                statusTitle.className = "text-2xl sm:text-3xl font-bold text-red-500 tracking-tight";
+                statusSubtitle.innerText = "Signal received from sender device!";
                 
                 if (data.latitude && data.longitude) {
-                    latVal.innerText = data.latitude.toFixed(6);
-                    lngVal.innerText = data.longitude.toFixed(6);
-                    mapLink.href = `https://maps.google.com/?q=${data.latitude},${data.longitude}`;
-                    locCard.classList.remove('hidden');
+                    document.getElementById('latVal').innerText = data.latitude;
+                    document.getElementById('lngVal').innerText = data.longitude;
+                    document.getElementById('mapLink').href = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
+                    locationCard.classList.remove('hidden');
                 }
 
                 startContinuousAlarm();
             } else {
                 banner.className = "bg-slate-900 border-2 border-slate-800 rounded-2xl p-6 sm:p-8 text-center shadow-2xl transition-all";
-                icon.innerText = "🛡️";
-                title.innerText = "System Status: Monitoring...";
-                title.className = "text-2xl sm:text-3xl font-bold text-emerald-400 tracking-tight";
-                subtitle.innerText = "Listening for emergency signals from connected mobile devices...";
-                locCard.classList.add('hidden');
+                alertIcon.innerText = "🛡️";
+                statusTitle.innerText = "System Status: Monitoring...";
+                statusTitle.className = "text-2xl sm:text-3xl font-bold text-emerald-400 tracking-tight";
+                statusSubtitle.innerText = "Listening for emergency signals from connected sender devices...";
+                locationCard.classList.add('hidden');
 
                 stopContinuousAlarm();
             }
-        }
-
-        // Listen for storage events (enables cross-tab / cross-device synchronization via Firebase or local storage test)
-        window.addEventListener('storage', (event) => {
-            if (event.key === STORAGE_KEY) {
-                try {
-                    const data = JSON.parse(event.newValue);
-                    updateLaptopReceiver(data);
-                } catch (e) {}
-            }
-        });
-
-        // Polling check to keep state synced across browser windows/tabs instantly
-        setInterval(() => {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (raw) {
-                try {
-                    const data = JSON.parse(raw);
-                    // Check if laptop view is active or check state change
-                    const laptopView = document.getElementById('laptopView');
-                    if (data.active && isAlarmPlaying === false) {
-                        updateLaptopReceiver(data);
-                    } else if (!data.active && isAlarmPlaying === true) {
-                        updateLaptopReceiver(data);
-                    }
-                } catch(e){}
-            }
-        }, 1000);
+        };
     </script>
 </body>
 </html>
